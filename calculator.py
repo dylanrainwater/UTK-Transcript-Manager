@@ -34,8 +34,11 @@ def show_menu():
         if choice in main_menu:
             clear()
             main_menu[choice]()
+    clear()
 
 def get_or_create_profile(msg):
+    """Prompt `msg`, then create the profile if it doesn't exist and return it
+    """
     profile_name = input(msg).lower().strip()
     profile, created = Profile.get_or_create(name=profile_name)
 
@@ -43,11 +46,32 @@ def get_or_create_profile(msg):
         print("Profile was created for {}.".format(profile.name))
 
     calculate_gpa(profile)
+
+    clear()
     return profile
 
 def get_courses_for(profile):
+    """Retrun list of courses that belong to a profile"""
     return Course.select().where(Course.profile == profile)
 
+def list_courses_for(profile):
+    """Print a list of all courses that belong to a profile"""
+    print("Showing: {}'s profile'".format(profile.name))
+    print("GPA: {0:.2f}".format(profile.GPA))
+    print("All courses and grades:")
+    courses = get_courses_for(profile)
+    print('='*75)
+    courses = get_courses_for(profile)
+    if courses:
+        for i, course in enumerate(courses):
+            # 1. [A]    EXAMPLE 101    3 hours
+            print("{}. {:10}{:10}{:10} hours".format(i + 1,
+                                                course.grade,
+                                                 course.name,
+                                                 course.hours))
+    else:
+        print("No courses to show at this time.")
+    print('='*75)
 
 def show_profile(profile=None):
     """Show the GPA and courses / grades for a specific profile"""
@@ -55,18 +79,7 @@ def show_profile(profile=None):
         profile = get_or_create_profile("Profile to show: ")
 
     calculate_gpa(profile)
-    print("GPA: {}".format(profile.GPA))
-    print("All courses and grades:")
-    print('='*75)
-    courses = get_courses_for(profile)
-    if courses:
-        for course in courses:
-            # [A]    EXAMPLE 101    3 hours
-            print("{:10}{:10}{:10} hours".format(course.grade, course.name, course.hours))
-    else:
-        print("No courses to show at this time.")
-    print('='*75)
-    print('\n\n')
+    list_courses_for(profile)
     print('s - Show another profile')
     print('e - Edit profile')
     print('q - Quit to menu')
@@ -87,9 +100,7 @@ def edit_profile(profile=None):
 
     first = True
     while True:
-        if not first:
-            print('Course added.')
-        print("GPA: {}".format(profile.GPA))
+        list_courses_for(profile)
         print('n - Add new course')
         print('s - Show summary')
         print('d - Delete course')
@@ -117,16 +128,21 @@ def edit_profile(profile=None):
         clear()
 
 def delete_course(profile):
-    while True:
-        courses = get_courses_for(profile)
-        for i, course in enumerate(courses):
-            print("({})\t{}".format(i + 1, course.name))
-
-        to_delete = int(input("Enter the number before the course to delete: "))
+    """Delete a course from a user's profile"""
+    courses = get_courses_for(profile)
+    while courses:
+        list_courses_for(profile)
+        m = "Enter 'q' to quit or enter the number before the course to delete:"
+        to_delete = input(m)
+        if to_delete == 'q':
+            return
+        to_delete = int(to_delete)
         courses[to_delete - 1].delete_instance()
 
-        next_action = input("Delete another? [y/n]: ").lower().strip()
-        if next_action == 'n':
+        next_action = input("Delete a course? [y/n]: ").lower().strip()
+
+        courses = get_courses_for(profile)
+        if next_action == 'n' and courses:
             return
 
 def calculate_gpa(profile):
