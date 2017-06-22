@@ -1,25 +1,11 @@
 from collections import OrderedDict
 import os
 
+from models import Profile
+from models import Course
+from models import db
+
 from peewee import *
-
-db = SqliteDatabase('calculator.db')
-
-class Profile(Model):
-    name = CharField(max_length=255, unique=True)
-    GPA = DecimalField(default=0.0)
-
-    class Meta:
-        database = db
-
-class Course(Model):
-    name = CharField(max_length=255)
-    grade = CharField(max_length=2)
-    hours = IntegerField()
-    profile = ForeignKeyField(Profile)
-
-    class Meta:
-        database = db
 
 def initialize():
     """Create database and tables"""
@@ -32,6 +18,7 @@ def clear():
     os.system(cmd)
 
 def show_menu():
+    """"Display main menu and options"""
     choice = None
 
     while choice != 'q':
@@ -39,34 +26,42 @@ def show_menu():
         print('='*20)
         print('UTK GPA Calculator')
         print('='*20)
-        for key, value in menu.items():
+        for key, value in main_menu.items():
             print("{} - {}".format(key, value.__doc__))
         print('q - Quit')
-        choice = input('> ').lower().strip()
 
-        if choice in menu:
+        choice = input('> ').lower().strip()
+        if choice in main_menu:
             clear()
-            menu[choice]()
+            main_menu[choice]()
+
+def get_or_create_profile(msg):
+    profile_name = input(msg).lower().strip()
+    profile, created = Profile.get_or_create(name=profile_name)
+
+    if created:
+        print("Profile was created for {}.".format(profile.name))
+
+    calculate_gpa(profile)
+    return profile
+
+def get_courses_for(profile):
+    return Course.select().where(Course.profile == profile)
+
 
 def show_profile(profile=None):
     """Show the GPA and courses / grades for a specific profile"""
     if not profile:
-        profile_name = input("Profile to show: ").lower().strip()
-        try:
-            profile = Profile.get(Profile.name == profile_name)
-        except Profile.DoesNotExist:
-            next = input("Profile for '{}' does not exist. Create? [y/n]".format(profile_name))
-            if next == 'n':
-                return
-            else:
-                profile = Profile.create(name=profile_name, GPA=0.0)
+        profile = get_or_create_profile("Profile to show: ")
+
     calculate_gpa(profile)
     print("GPA: {}".format(profile.GPA))
     print("All courses and grades:")
     print('='*75)
-    courses = Course.select().where(Course.profile == profile)
+    courses = get_courses_for(profile)
     if courses:
         for course in courses:
+            # [A]    EXAMPLE 101    3 hours
             print("{:10}{:10}{:10} hours".format(course.grade, course.name, course.hours))
     else:
         print("No courses to show at this time.")
@@ -86,12 +81,9 @@ def show_profile(profile=None):
 
 
 def edit_profile(profile=None):
-    """Remove, edit, or add new courses / grades to a profile"""
+    """Edit profile to create, change, or delete courses"""
     if not profile:
-        profile_name = input("Profile to edit: ").lower().strip()
-        profile, created = Profile.get_or_create(name=profile_name)
-        if created:
-            print("Profile for {} was created".format(profile.name))
+        profile = get_or_create_profile("Profile to edit: ")
 
     first = True
     while True:
@@ -126,7 +118,7 @@ def edit_profile(profile=None):
 
 def delete_course(profile):
     while True:
-        courses = Course.select().where(Course.profile == profile)
+        courses = get_courses_for(profile)
         for i, course in enumerate(courses):
             print("({})\t{}".format(i + 1, course.name))
 
@@ -138,7 +130,18 @@ def delete_course(profile):
             return
 
 def calculate_gpa(profile):
-    courses = Course.select().where(Course.profile == profile)
+    """Calculate GPA using UTK's scale:
+        Add all attempted hours together
+        Add all quality points
+            A = 4
+            A- = 3.7
+            B+ = 3.3
+            B = 3
+            B- = 2.7
+            ...
+        GPA = quality points / attempted hours
+    """
+    courses = get_courses_for(profile)
     if len(courses) == 0:
         profile.GPA = 0.0
         profile.save()
@@ -148,31 +151,13 @@ def calculate_gpa(profile):
     if courses:
         for course in courses:
             total_hours += course.hours
-            quality_points = 0
-            if course.grade == 'A':
-                quality_points = 4
-            if course.grade == 'A-':
-                quality_points = 3.7
-            if course.grade == 'B+':
-                quality_points = 3.3
-            if course.grade == 'B':
-                quality_points = 3
-            if course.grade == 'B-':
-                quality_points = 2.7
-            if course.grade == 'C+':
-                quality_points = 2.3
-            if course.grade == 'C':
-                quality_points = 2
-            if course.grade == 'C-':
-                quality_points = 1.7
-            if course.grade == 'D+':
-                quality_points = 1.3
-            if course.grade == 'D':
-                quality_points = 1
-            if course.grade == 'D-':
-                quality_points = 0.7
-            if course.grade == 'F':
-                quality_points = 0
+            quality_points = points[course.grade[0]]
+            if len(course.grade) == 2:
+                if course.grade[1] == '+':
+                    quality_points += 0.3
+                else:
+                    quality_points -= 0.3
+
             total_quality_points += quality_points * course.hours
     total_gpa = total_quality_points / total_hours
     profile.GPA = total_gpa
@@ -183,8 +168,8 @@ def list_profiles():
     for profile in Profile.select().order_by(Profile.GPA.desc()):
         print("Name:\t{}\tGPA:\t{}".format(profile.name, profile.GPA))
     input("Press Enter to return to menu.")
-    
-menu = OrderedDict([
+
+main_menu = OrderedDict([
     ('s', show_profile),
     ('r', edit_profile),
     ('p', list_profiles),
@@ -193,10 +178,8 @@ menu = OrderedDict([
 letter_grades = ['A', 'A-', 'B+', 'B', 'B-', 'C+', 'C',
                  'C-', 'D+', 'D', 'D-', 'F']
 
-#  Read existing GPA, classes/grades for profile
-#  Read new classes/grades
-#  Calculate GPA
-#  Save new GPA, classes/grades to profile
+points = {'A': 4, 'B': 3, 'C': 2, 'D': 1, 'F': 0}
+
 if __name__ == '__main__':
     initialize()
     show_menu()
