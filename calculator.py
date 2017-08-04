@@ -56,7 +56,7 @@ def get_courses_for(profile):
 
 def list_courses_for(profile):
     """Print a list of all courses that belong to a profile"""
-    print("Showing: {}'s profile'".format(profile.name))
+    print("Showing: {}'s profile".format(profile.name))
     print("GPA: {0:.2f}".format(profile.GPA))
     print("All courses and grades:")
     courses = get_courses_for(profile)
