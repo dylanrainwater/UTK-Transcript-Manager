@@ -1,4 +1,4 @@
-**GPA Calculator**
+**Transcript Manager**
 ---------
 ![GIF of usage](media/demo.gif)
 
@@ -7,12 +7,12 @@ Using the University of Tennessee, Knoxville's (UTK) method. You can create seve
 # Usage
 Requires python3 and peewee.
 
-    > pip install peewee
+	> pip install peewee
 
-    > git clone git@github.com:dylanrainwater/utk_gpa_calc.git
+	> git clone git@github.com:dylanrainwater/utk_gpa_calc.git
 
 	> cd utk_gpa_calc
 
 	> python calculator.py
 
-Then simply navigate the menus.
+Then simply navigate the menus within the program.
